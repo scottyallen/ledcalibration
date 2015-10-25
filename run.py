@@ -8,26 +8,33 @@ import cv2
 import serial
 
 MIN_SIZE = 20
-LED_START = 35
+LED_START = 10
 LED_MAX = 48
 LED_INCREMENT = 1
-BLINK_DELAY = 0.1
-NUM_BLINKS = 5
-WARMUP_PASSES = 5
+LED_NUM = LED_MAX - LED_START
+BLINK_DELAY = 0.05
+NUM_BLINKS = 2
+WARMUP_TIME = 1
+LED_BLINK_INTENSITY = 255
 
 class LEDArray(object):
 
-  def __init__(self, device, baud=9600):
+  def __init__(self, device, baud=115200):
     self.serial = serial.Serial(device, baud)
 
   def setLed(self, led, val):
     self.serial.write("%d %d\n" % (led, val))
+    time.sleep(3/1000.0)
+
+  def clear(self):
+    for led in xrange(0, LED_MAX):
+      self.setLed(led, 0)
 
 def blink():
   led_array = LEDArray("/dev/tty.usbmodem1411")
 
   while True:
-    led_array.setLed(0, 1)
+    led_array.setLed(0, 128)
     time.sleep(0.1)
     led_array.setLed(0, 0)
     time.sleep(0.1)
@@ -67,30 +74,38 @@ class LEDCalibrator(object):
 
     return groups
 
+  def warmup(self):
+    for i in xrange(int(WARMUP_TIME / (BLINK_DELAY * 2))):
+      for led in xrange(LED_START, LED_MAX + 1, LED_INCREMENT):
+        print "led: %d on" % led
+        self.led_array.setLed(led, 64)
+      time.sleep(BLINK_DELAY)
+
+      for led in xrange(LED_START, LED_MAX + 1, LED_INCREMENT):
+        print "led: %d off" % led
+        self.led_array.setLed(led, 0)
+      time.sleep(BLINK_DELAY)
+
+    self.led_array.clear()
+
   def run(self):
     # wait for the detector to start up
     while not self.detector.running:
       time.sleep(0.1)
 
-    for i in xrange(WARMUP_PASSES):
-      for led in xrange(LED_START, LED_MAX + 1, LED_INCREMENT):
-        self.led_array.setLed(led, 1)
-        time.sleep(BLINK_DELAY)
+    self.led_array.clear()
+
+    # blink everything, so we can point the camera in the right direction
+    self.warmup()
 
     # Cycle through each led
     for led in xrange(LED_START, LED_MAX + 1, LED_INCREMENT):
-      for i in xrange(2):
-        self.led_array.setLed(led, 1)
-        time.sleep(BLINK_DELAY)
-
-        self.led_array.setLed(led, 0)
-        time.sleep(BLINK_DELAY)
-
       # throw initial points away - they might be contaminated
+      time.sleep(BLINK_DELAY)
       self.detector.getPoints()
 
       for i in xrange(NUM_BLINKS):
-        self.led_array.setLed(led, 1)
+        self.led_array.setLed(led, LED_BLINK_INTENSITY)
         time.sleep(BLINK_DELAY)
 
         self.led_array.setLed(led, 0)
@@ -130,10 +145,28 @@ def led_detect():
   for led, position in sorted_leds:
     print led, position
 
+  min_y = sorted_leds[0][1][1]
+  max_y = sorted_leds[-1][1][1]
+  
+  print "min_y: %r max_y: %r" % (min_y, max_y)
+
+  led_array.clear()
+
+  # vertical fade
   while True:
-    for led, position in sorted_leds:
-      led_array.setLed(led, 1)
-      time.sleep(BLINK_DELAY)
+    for y in xrange(max_y, min_y, -10):
+      for led, position in leds.iteritems():
+        scale = min(255, abs(y - position[1]) * 2)
+        value = max(0, 128 - scale)
+        print value
+        led_array.setLed(led, value)
+
+    for y in xrange(min_y, max_y, 10):
+      for led, position in leds.iteritems():
+        scale = min(255, abs(y - position[1]) * 2)
+        value = max(0, 128 - scale)
+        print value
+        led_array.setLed(led, value)
 
 
 class LEDDetector(object):
