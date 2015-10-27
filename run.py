@@ -1,3 +1,4 @@
+import json
 import sys
 import threading
 import time
@@ -31,6 +32,8 @@ gflags.DEFINE_integer('serial_write_delay', 3,
                       'Without this, my arduino seems to get overwhelmed, and drops commands.'
 gflags.DEFINE_bool('incremental_intensity', True,
                    'Blink in increasing intensity, to try and cope with camera blowout.')
+gflags.DEFINE_string('save', '', 'Filename to save led positions to.')
+gflags.DEFINE_string('load', '', 'Filename to load led positions from.')
 
 FLAGS = gflags.FLAGS
 
@@ -314,7 +317,12 @@ def avg(nums):
   return sum(nums) / len(nums)
 
 def main(argv):
-  leds = led_detect()
+  if FLAGS.load:
+    leds = json.dump(leds, open(FLAGS.save, 'w'))
+  else:
+    leds = led_detect()
+    if FLAGS.save:
+      json.dump(leds, open(FLAGS.save, 'w'))
   animation(leds)
 
 if __name__ == '__main__':
