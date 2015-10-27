@@ -321,8 +321,11 @@ def avg(nums):
   return sum(nums) / len(nums)
 
 def main(argv):
+  leds = None
   if FLAGS.load:
-    leds = json.dump(leds, open(FLAGS.save, 'w'))
+    print "Loading..."
+    leds = json.load(open(FLAGS.load))
+    leds = dict([(int(k), v) for k, v in leds.iteritems()])
   else:
     leds = led_detect()
     if FLAGS.save:
