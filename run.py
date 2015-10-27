@@ -29,7 +29,7 @@ gflags.DEFINE_string('serial_baud', 115200,
                      'The baud rate for the serial port.')
 gflags.DEFINE_integer('serial_write_delay', 3,
                       'Number of milliseconds to wait between sending commands to the arduino. '
-                      'Without this, my arduino seems to get overwhelmed, and drops commands.'
+                      'Without this, my arduino seems to get overwhelmed, and drops commands.')
 gflags.DEFINE_bool('incremental_intensity', True,
                    'Blink in increasing intensity, to try and cope with camera blowout.')
 gflags.DEFINE_string('save', '', 'Filename to save led positions to.')
