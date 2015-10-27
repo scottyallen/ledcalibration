@@ -45,7 +45,7 @@ class LEDArray(object):
 
   def setLed(self, led, hue, saturation, value):
     '''Set a given led to a given value.'''
-    self.serial.write("%s\n" % ''.join(map(chr, [hue, saturation, value])))
+    self.serial.write("%s\n" % ''.join(map(chr, [led, hue, saturation, value])))
     time.sleep(FLAGS.serial_write_delay / 1000.0)
 
   def clear(self):
