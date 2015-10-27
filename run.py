@@ -29,18 +29,24 @@ gflags.DEFINE_string('serial_baud', 115200,
 gflags.DEFINE_integer('serial_write_delay', 3,
                       'Number of milliseconds to wait between sending commands to the arduino. '
                       'Without this, my arduino seems to get overwhelmed, and drops commands.'
+gflags.DEFINE_bool('incremental_intensity', True,
+                   'Blink in increasing intensity, to try and cope with camera blowout.')
+
 FLAGS = gflags.FLAGS
 
 class LEDArray(object):
+  '''An indidvually addressable array of LEDs.'''
 
   def __init__(self, device, baud=FLAGS.serial_baud):
     self.serial = serial.Serial(device, baud)
 
   def setLed(self, led, val):
+    '''Set a given led to a given brightness value.'''
     self.serial.write("%d %d\n" % (led, val))
     time.sleep(FLAGS.serial_write_delay/1000.0)
 
   def clear(self):
+    '''Turn off all leds in the array.'''
     for led in xrange(0, FLAGS.led_max):
       self.setLed(led, 0)
 
@@ -50,16 +56,18 @@ class LEDCalibrator(object):
   def __init__(self, detector, led_array):
     self.detector = detector
     self.led_array = led_array
-    self.thread = threading.Thread(target=self.run)
+    self.thread = threading.Thread(target=self._run)
     self.thread.daemon = True
 
   def start(self):
+    '''Start calibration. Should be called in the main thread.'''
     self.leds = {}
     self.thread.start()
-    self.detector.run()
+    self.detector._run()
     self.thread.join()
 
   def groupPoints(self, points, tolerance):
+    '''Groups points that are within a given pixel distance from each other (manhattan distance).'''
     if not points:
       return []
 
@@ -80,8 +88,9 @@ class LEDCalibrator(object):
 
     return groups
 
-  def warmup(self):
-    for i in xrange(int(FLAGS.warmup_time / (FLAGS.blink_delay * 2))):
+  def warmup(self, warmup_time):
+    '''Blink all the leds for a given number of seconds.'''
+    for i in xrange(int(warmup_time / (FLAGS.blink_delay * 2))):
       for led in xrange(FLAGS.led_start, FLAGS.led_max + 1):
         self.led_array.setLed(led, 64)
       time.sleep(FLAGS.blink_delay)
@@ -92,7 +101,8 @@ class LEDCalibrator(object):
 
     self.led_array.clear()
 
-  def run(self):
+  def _run(self):
+    '''Run the actual calibration.'''
     # wait for the detector to start up
     while not self.detector.running:
       time.sleep(0.1)
@@ -100,7 +110,7 @@ class LEDCalibrator(object):
     self.led_array.clear()
 
     # blink everything, so we can point the camera in the right direction
-    self.warmup()
+    self.warmup(FLAGS.warmup_time)
 
     # Cycle through each led
     for led in xrange(FLAGS.led_start, FLAGS.led_max + 1):
@@ -108,10 +118,14 @@ class LEDCalibrator(object):
       time.sleep(FLAGS.blink_delay)
       self.detector.getPoints()
 
-      intensity_increment = FLAGS.led_blink_intensity / FLAGS.num_blinks
-      intensity = intensity_increment
+      if FLAGS.incremental_intensity:
+        intensity_increment = FLAGS.led_blink_intensity / FLAGS.num_blinks
+        intensity = intensity_increment
+      else:
+        intensity_increment = 0
+        intensity = FLAGS.led_blink_intensity
+
       for i in xrange(FLAGS.num_blinks):
-        print "intensity:", intensity
         self.led_array.setLed(led, intensity)
         intensity += intensity_increment
         time.sleep(FLAGS.blink_delay)
@@ -126,7 +140,7 @@ class LEDCalibrator(object):
 
       for i, group in enumerate(groups):
         group.sort()
-        print "#%d" % i
+        print "Group #%d" % i
         print "\n".join(["%d, %d" % (x, y) for x, y in group])
         print
 
@@ -142,19 +156,21 @@ class LEDCalibrator(object):
 
 
 def led_detect():
+  '''Run the calibration routine.'''
   detector = LEDDetector()
   led_array = LEDArray(FLAGS.arduino_serial_device)
   calibrator = LEDCalibrator(detector, led_array)
   calibrator.start()
   leds = calibrator.leds
+  return leds
 
+def animation(leds):
+  '''Run some test animations.'''
   sorted_leds = sorted(leds.items(), key=lambda x: x[1][1])
 
   min_y = sorted_leds[0][1][1]
   max_y = sorted_leds[-1][1][1]
   
-  print "min_y: %r max_y: %r" % (min_y, max_y)
-
   led_array.clear()
 
   # vertical fade
@@ -173,6 +189,14 @@ def led_detect():
 
 
 class LEDDetector(object):
+  '''Detects possible led positions using the camera.
+
+  While running, grabs frames from the camera, looking for potential leds.  Call run() in the main
+  thread to start it, which blocks.  Call getPoints() in a separate thread to get a list of 2d
+  points where an led could potentially be since the last time it was called.  Call stop() to stop
+  it.  Displays a gui window showing what the camera is seeing with overlays of where leds are
+  detected, for debugging.
+  '''
 
   def __init__(self):
     self.running = False
@@ -181,19 +205,29 @@ class LEDDetector(object):
     self._should_stop = False
 
   def _addPoint(self, point):
+    '''Add a point to the queue.'''
     with self.lock:
       self.point_queue.append(point)
 
   def getPoints(self):
+    '''Get the list of points where an led was detected since the last call.
+
+    Returns: A list of (x, y) tuples in pixels.
+    '''
     with self.lock:
       out = self.point_queue
       self.point_queue = []
       return out
 
   def stop(self):
+    '''Stop the LEDDetector running.'''
     self._should_stop = True
 
   def run(self):
+    '''Start the LEDDetector.
+
+    Starts the camera capture and gui display.
+    '''
     video_capture = cv2.VideoCapture(0)
 
     previous = None
@@ -229,9 +263,6 @@ class LEDDetector(object):
       previous = thresh
 
       display = frame.copy()
-      #display = cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
-      #display = cv2.cvtColor(diff, cv2.COLOR_GRAY2RGB)
-      #display = np.zeros((720, 1280, 3), np.uint8)
 
       contours, hierarchy = cv2.findContours(diff, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -276,10 +307,15 @@ class LEDDetector(object):
     cv2.destroyAllWindows()
 
 def avg(nums):
+  '''Returns the average of a list of numbers.
+
+  Returns an integer if all inputs are integers.
+  '''
   return sum(nums) / len(nums)
 
 def main(argv):
-  led_detect()
+  leds = led_detect()
+  animation(leds)
 
 if __name__ == '__main__':
   argv = gflags.FLAGS(sys.argv)
