@@ -177,6 +177,7 @@ def animation(leds):
   min_y = sorted_leds[0][1][1]
   max_y = sorted_leds[-1][1][1]
   
+  led_array = LEDArray(FLAGS.arduino_serial_device)
   led_array.clear()
 
   # vertical fade
