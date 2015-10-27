@@ -40,15 +40,15 @@ class LEDArray(object):
   def __init__(self, device, baud=FLAGS.serial_baud):
     self.serial = serial.Serial(device, baud)
 
-  def setLed(self, led, val):
-    '''Set a given led to a given brightness value.'''
-    self.serial.write("%d %d\n" % (led, val))
-    time.sleep(FLAGS.serial_write_delay/1000.0)
+  def setLed(self, led, hue, saturation, value):
+    '''Set a given led to a given value.'''
+    self.serial.write("%s\n" % ''.join(map(chr, [hue, saturation, value])))
+    time.sleep(FLAGS.serial_write_delay / 1000.0)
 
   def clear(self):
     '''Turn off all leds in the array.'''
     for led in xrange(0, FLAGS.led_max):
-      self.setLed(led, 0)
+      self.setLed(led, 0, 0, 0)
 
 
 class LEDCalibrator(object):
@@ -92,11 +92,11 @@ class LEDCalibrator(object):
     '''Blink all the leds for a given number of seconds.'''
     for i in xrange(int(warmup_time / (FLAGS.blink_delay * 2))):
       for led in xrange(FLAGS.led_start, FLAGS.led_max + 1):
-        self.led_array.setLed(led, 64)
+        self.led_array.setLed(led, 0, 0, 64)
       time.sleep(FLAGS.blink_delay)
 
       for led in xrange(FLAGS.led_start, FLAGS.led_max + 1):
-        self.led_array.setLed(led, 0)
+        self.led_array.setLed(led, 0, 0, 0)
       time.sleep(FLAGS.blink_delay)
 
     self.led_array.clear()
@@ -126,11 +126,11 @@ class LEDCalibrator(object):
         intensity = FLAGS.led_blink_intensity
 
       for i in xrange(FLAGS.num_blinks):
-        self.led_array.setLed(led, intensity)
+        self.led_array.setLed(led, 0, 0, intensity)
         intensity += intensity_increment
         time.sleep(FLAGS.blink_delay)
 
-        self.led_array.setLed(led, 0)
+        self.led_array.setLed(led, 0, 0, 0)
         time.sleep(FLAGS.blink_delay)
 
       print "LED #%d" % led
@@ -179,13 +179,13 @@ def animation(leds):
       for led, position in leds.iteritems():
         scale = min(255, abs(y - position[1]) * 2)
         value = max(0, 128 - scale)
-        led_array.setLed(led, value)
+        led_array.setLed(led, 0, 0, value)
 
     for y in xrange(min_y, max_y, 10):
       for led, position in leds.iteritems():
         scale = min(255, abs(y - position[1]) * 2)
         value = max(0, 128 - scale)
-        led_array.setLed(led, value)
+        led_array.setLed(led, 0, 0, value)
 
 
 class LEDDetector(object):

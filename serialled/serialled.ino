@@ -14,18 +14,27 @@ void setup() {
 
 void loop() {
   while (Serial.available() > 0) {
-    String line = Serial.readStringUntil('\n');
-    int separator = line.indexOf(' ');
-    int ledNum = line.substring(0, separator).toInt();
-    int ledVal = line.substring(separator).toInt();
-    //Serial.println(ledNum);
-    //Serial.println(ledVal);
-    //Serial.println();
-
-    //for (int i = 0; i < NUM_LEDS; i++) {
-      //leds[i] = CRGB::Black;
-    //}
-    leds[ledNum] = CHSV(255, 0, ledVal);
+    char line[4];
+    int length = Serial.readBytesUntil('\n', line, 4);
+    if (length != 4) {
+//      Serial.println("bad frame - skipping");
+      continue;
+    }
+    int ledNum = line[0];
+    int hue = line[1];
+    int saturation = line[2];
+    int value = line[3];
+//    Serial.print("led: ");
+//    Serial.print(ledNum);
+//    Serial.print(" hue: ");
+//    Serial.print(hue);
+//    Serial.print(" saturation: ");
+//    Serial.print(saturation);
+//    Serial.print(" value: ");
+//    Serial.print(value);
+//    Serial.println();
+    
+    leds[ledNum] = CHSV(hue, saturation, value);
     FastLED.show();
   }
 }
