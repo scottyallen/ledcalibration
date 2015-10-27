@@ -66,7 +66,7 @@ class LEDCalibrator(object):
     '''Start calibration. Should be called in the main thread.'''
     self.leds = {}
     self.thread.start()
-    self.detector._run()
+    self.detector.run()
     self.thread.join()
 
   def groupPoints(self, points, tolerance):
