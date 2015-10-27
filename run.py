@@ -44,14 +44,6 @@ class LEDArray(object):
     for led in xrange(0, FLAGS.led_max):
       self.setLed(led, 0)
 
-def blink():
-  led_array = LEDArray(FLAGS.arduino_serial_device)
-
-  while True:
-    led_array.setLed(0, 128)
-    time.sleep(0.1)
-    led_array.setLed(0, 0)
-    time.sleep(0.1)
 
 class LEDCalibrator(object):
 
@@ -288,7 +280,6 @@ def avg(nums):
 
 def main(argv):
   led_detect()
-  #blink()
 
 if __name__ == '__main__':
   argv = gflags.FLAGS(sys.argv)
