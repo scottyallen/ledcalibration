@@ -10,7 +10,7 @@ import gflags
 
 
 gflags.DEFINE_integer('min_led_size', 20,
-                     'The minimum bounding box size of an led contour as seen by the camera, in pixels.  '
+                     'The minimum bounding box size of an led contour as seen by the camera, in pixels. '
                      'Any contours smaller than this will be discarded.')
 gflags.DEFINE_integer('led_start', 10, 'The index of the first led to include in the leds to calibrate.')
 gflags.DEFINE_integer('led_max', 48, 'The index of the last led to include in the leds to calibrate.')
@@ -20,10 +20,13 @@ gflags.DEFINE_integer('warmup_time', 1,
                       'How long to blink all of the leds prior to starting calibration, to allow for '
                       'alignment of the camera.')
 gflags.DEFINE_integer('led_blink_intensity', 255,
-                     'The brightness of the led blinks during calibration.  Lower values may help with '
+                     'The brightness of the led blinks during calibration. Lower values may help with '
                      'camera blowout. Number between 0-255.')
 gflags.DEFINE_string('arduino_serial_device', '/dev/tty.usbmodem1411',
                      'The path to the serial device for the arduino')
+gflags.DEFINE_integer('serial_write_delay', 3,
+                      'Number of milliseconds to wait between sending commands to the arduino. '
+                      'Without this, my arduino seems to get overwhelmed, and drops commands.'
 FLAGS = gflags.FLAGS
 
 class LEDArray(object):
@@ -33,7 +36,7 @@ class LEDArray(object):
 
   def setLed(self, led, val):
     self.serial.write("%d %d\n" % (led, val))
-    time.sleep(3/1000.0)
+    time.sleep(FLAGS.serial_write_delay/1000.0)
 
   def clear(self):
     for led in xrange(0, FLAGS.led_max):
