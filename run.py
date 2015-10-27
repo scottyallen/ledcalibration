@@ -6,16 +6,25 @@ import numpy as np
 
 import cv2
 import serial
+import gflags
 
-MIN_SIZE = 20
-LED_START = 10
-LED_MAX = 48
-LED_INCREMENT = 1
-LED_NUM = LED_MAX - LED_START
-BLINK_DELAY = 0.05
-NUM_BLINKS = 2
-WARMUP_TIME = 1
-LED_BLINK_INTENSITY = 255
+
+gflags.DEFINE_integer('min_led_size', 20,
+                     'The minimum bounding box size of an led contour as seen by the camera, in pixels.  '
+                     'Any contours smaller than this will be discarded.')
+gflags.DEFINE_integer('led_start', 10, 'The index of the first led to include in the leds to calibrate.')
+gflags.DEFINE_integer('led_max', 48, 'The index of the last led to include in the leds to calibrate.')
+gflags.DEFINE_float('blink_delay', 0.05, 'The length of a blink of an led during calibration, in seconds.')
+gflags.DEFINE_integer('num_blinks', 3, 'The number of times to blink an led during calibration.')
+gflags.DEFINE_integer('warmup_time', 1,
+                      'How long to blink all of the leds prior to starting calibration, to allow for '
+                      'alignment of the camera.')
+gflags.DEFINE_integer('led_blink_intensity', 255,
+                     'The brightness of the led blinks during calibration.  Lower values may help with '
+                     'camera blowout. Number between 0-255.')
+gflags.DEFINE_string('arduino_serial_device', '/dev/tty.usbmodem1411',
+                     'The path to the serial device for the arduino')
+FLAGS = gflags.FLAGS
 
 class LEDArray(object):
 
@@ -27,11 +36,11 @@ class LEDArray(object):
     time.sleep(3/1000.0)
 
   def clear(self):
-    for led in xrange(0, LED_MAX):
+    for led in xrange(0, FLAGS.led_max):
       self.setLed(led, 0)
 
 def blink():
-  led_array = LEDArray("/dev/tty.usbmodem1411")
+  led_array = LEDArray(FLAGS.arduino_serial_device)
 
   while True:
     led_array.setLed(0, 128)
@@ -75,16 +84,14 @@ class LEDCalibrator(object):
     return groups
 
   def warmup(self):
-    for i in xrange(int(WARMUP_TIME / (BLINK_DELAY * 2))):
-      for led in xrange(LED_START, LED_MAX + 1, LED_INCREMENT):
-        print "led: %d on" % led
+    for i in xrange(int(FLAGS.warmup_time / (FLAGS.blink_delay * 2))):
+      for led in xrange(FLAGS.led_start, FLAGS.led_max + 1):
         self.led_array.setLed(led, 64)
-      time.sleep(BLINK_DELAY)
+      time.sleep(FLAGS.blink_delay)
 
-      for led in xrange(LED_START, LED_MAX + 1, LED_INCREMENT):
-        print "led: %d off" % led
+      for led in xrange(FLAGS.led_start, FLAGS.led_max + 1):
         self.led_array.setLed(led, 0)
-      time.sleep(BLINK_DELAY)
+      time.sleep(FLAGS.blink_delay)
 
     self.led_array.clear()
 
@@ -99,17 +106,21 @@ class LEDCalibrator(object):
     self.warmup()
 
     # Cycle through each led
-    for led in xrange(LED_START, LED_MAX + 1, LED_INCREMENT):
+    for led in xrange(FLAGS.led_start, FLAGS.led_max + 1):
       # throw initial points away - they might be contaminated
-      time.sleep(BLINK_DELAY)
+      time.sleep(FLAGS.blink_delay)
       self.detector.getPoints()
 
-      for i in xrange(NUM_BLINKS):
-        self.led_array.setLed(led, LED_BLINK_INTENSITY)
-        time.sleep(BLINK_DELAY)
+      intensity_increment = FLAGS.led_blink_intensity / FLAGS.num_blinks
+      intensity = intensity_increment
+      for i in xrange(FLAGS.num_blinks):
+        print "intensity:", intensity
+        self.led_array.setLed(led, intensity)
+        intensity += intensity_increment
+        time.sleep(FLAGS.blink_delay)
 
         self.led_array.setLed(led, 0)
-        time.sleep(BLINK_DELAY)
+        time.sleep(FLAGS.blink_delay)
 
       print "LED #%d" % led
       points = self.detector.getPoints()
@@ -135,15 +146,12 @@ class LEDCalibrator(object):
 
 def led_detect():
   detector = LEDDetector()
-  led_array = LEDArray("/dev/tty.usbmodem1411")
+  led_array = LEDArray(FLAGS.arduino_serial_device)
   calibrator = LEDCalibrator(detector, led_array)
   calibrator.start()
   leds = calibrator.leds
 
   sorted_leds = sorted(leds.items(), key=lambda x: x[1][1])
-
-  for led, position in sorted_leds:
-    print led, position
 
   min_y = sorted_leds[0][1][1]
   max_y = sorted_leds[-1][1][1]
@@ -158,14 +166,12 @@ def led_detect():
       for led, position in leds.iteritems():
         scale = min(255, abs(y - position[1]) * 2)
         value = max(0, 128 - scale)
-        print value
         led_array.setLed(led, value)
 
     for y in xrange(min_y, max_y, 10):
       for led, position in leds.iteritems():
         scale = min(255, abs(y - position[1]) * 2)
         value = max(0, 128 - scale)
-        print value
         led_array.setLed(led, value)
 
 
@@ -241,7 +247,7 @@ class LEDDetector(object):
       found_rectangles = []
       found_points = []
       for x, y, width, height in regions:
-        if width < MIN_SIZE or height < MIN_SIZE:
+        if width < FLAGS.min_led_size or height < FLAGS.min_led_size:
           continue
         pt1 = x,y
         pt2 = x+width,y+height
@@ -280,4 +286,5 @@ def main(argv):
   #blink()
 
 if __name__ == '__main__':
-  main(sys.argv)
+  argv = gflags.FLAGS(sys.argv)
+  main(argv)
