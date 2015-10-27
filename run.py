@@ -115,6 +115,8 @@ class LEDCalibrator(object):
     # blink everything, so we can point the camera in the right direction
     self.warmup(FLAGS.warmup_time)
 
+    self.led_array.clear()
+
     # Cycle through each led
     for led in xrange(FLAGS.led_start, FLAGS.led_max + 1):
       # throw initial points away - they might be contaminated
@@ -128,6 +130,7 @@ class LEDCalibrator(object):
         intensity_increment = 0
         intensity = FLAGS.led_blink_intensity
 
+      self.led_array.setLed(led, 0, 0, 0)
       for i in xrange(FLAGS.num_blinks):
         self.led_array.setLed(led, 0, 0, intensity)
         intensity += intensity_increment
