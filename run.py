@@ -1,4 +1,5 @@
 import json
+import math
 import sys
 import threading
 import time
@@ -170,29 +171,74 @@ def led_detect():
   leds = calibrator.leds
   return leds
 
-def animation(leds):
+def vertical_color_fade(led_array, leds):
   '''Run some test animations.'''
   sorted_leds = sorted(leds.items(), key=lambda x: x[1][1])
 
   min_y = sorted_leds[0][1][1]
   max_y = sorted_leds[-1][1][1]
   
-  led_array = LEDArray(FLAGS.arduino_serial_device)
-  led_array.clear()
+  for y in xrange(max_y, min_y, -20):
+    for led, position in leds.iteritems():
+      scale = min(255, abs(y - position[1]) * 2)
+      value = max(0, 128 - scale)
+      led_array.setLed(led, value, 255, 128)
 
-  # vertical fade
-  while True:
-    for y in xrange(max_y, min_y, -10):
-      for led, position in leds.iteritems():
-        scale = min(255, abs(y - position[1]) * 2)
-        value = max(0, 128 - scale)
-        led_array.setLed(led, 0, 0, value)
+  for y in xrange(min_y, max_y, 20):
+    for led, position in leds.iteritems():
+      scale = min(255, abs(y - position[1]) * 2)
+      value = max(0, 128 - scale)
+      led_array.setLed(led, value, 255, 128)
 
-    for y in xrange(min_y, max_y, 10):
-      for led, position in leds.iteritems():
-        scale = min(255, abs(y - position[1]) * 2)
-        value = max(0, 128 - scale)
-        led_array.setLed(led, 0, 0, value)
+def horizontal_color_fade(led_array, leds):
+  '''Run some test animations.'''
+  sorted_leds = sorted(leds.items(), key=lambda x: x[1][0])
+
+  min_x = sorted_leds[0][1][0]
+  max_x = sorted_leds[-1][1][0]
+  
+  for x in xrange(max_x, min_x, -20):
+    for led, position in leds.iteritems():
+      scale = min(255, abs(x - position[0]) * 2)
+      value = max(0, 128 - scale)
+      led_array.setLed(led, value, 255, 128)
+
+  for x in xrange(min_x, max_x, 20):
+    for led, position in leds.iteritems():
+      scale = min(255, abs(x - position[0]) * 2)
+      value = max(0, 128 - scale)
+      led_array.setLed(led, value, 255, 128)
+        
+def circular_color_fade(led_array, leds):
+  '''Run some test animations.'''
+  sorted_leds = sorted(leds.items(), key=lambda x: x[1][0])
+
+  min_x = sorted_leds[0][1][0]
+  max_x = sorted_leds[-1][1][0]
+  width = max_x - min_x
+
+  sorted_leds = sorted(leds.items(), key=lambda x: x[1][1])
+
+  min_y = sorted_leds[0][1][1]
+  max_y = sorted_leds[-1][1][1]
+  height = max_y - min_y
+  
+  max_distance = max(width, height)
+
+  middle = min_x + width/2, min_y + height/2
+
+
+  leds_by_distance = [(led, distance(middle, position)) for led, position in leds.iteritems()]
+
+  for target_distance in xrange(0, max_distance, 25):
+    for led, actual_distance in leds_by_distance:
+      scale = min(255, abs(int(target_distance - actual_distance)))
+      value = max(0, 128 - scale)
+      led_array.setLed(led, value, 255, 128)
+
+def distance(pt1, pt2):
+  return math.sqrt((pt1[0] - pt2[0]) ** 2 +
+                   (pt1[1] - pt2[1]) ** 2)
 
 
 class LEDDetector(object):
@@ -330,7 +376,13 @@ def main(argv):
     leds = led_detect()
     if FLAGS.save:
       json.dump(leds, open(FLAGS.save, 'w'))
-  animation(leds)
+
+  while True:
+    led_array = LEDArray(FLAGS.arduino_serial_device)
+    circular_color_fade(led_array, leds)
+    circular_color_fade(led_array, leds)
+    vertical_color_fade(led_array, leds)
+    horizontal_color_fade(led_array, leds)
 
 if __name__ == '__main__':
   argv = gflags.FLAGS(sys.argv)
