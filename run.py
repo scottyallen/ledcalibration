@@ -24,6 +24,8 @@ gflags.DEFINE_integer('led_blink_intensity', 255,
                      'camera blowout. Number between 0-255.')
 gflags.DEFINE_string('arduino_serial_device', '/dev/tty.usbmodem1411',
                      'The path to the serial device for the arduino')
+gflags.DEFINE_string('serial_baud', 115200,
+                     'The baud rate for the serial port.')
 gflags.DEFINE_integer('serial_write_delay', 3,
                       'Number of milliseconds to wait between sending commands to the arduino. '
                       'Without this, my arduino seems to get overwhelmed, and drops commands.'
@@ -31,7 +33,7 @@ FLAGS = gflags.FLAGS
 
 class LEDArray(object):
 
-  def __init__(self, device, baud=115200):
+  def __init__(self, device, baud=FLAGS.serial_baud):
     self.serial = serial.Serial(device, baud)
 
   def setLed(self, led, val):
